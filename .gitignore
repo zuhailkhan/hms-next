@@ -1,4 +1,7 @@
 /node_modules
 Timeline_be.md
 dist/
-src/config/keys.ts
+oldsrc/
+oldsrc/config/keys.ts
+.vs/
+.env
