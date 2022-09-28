@@ -108,9 +108,32 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     .catch(err => Logging.error(err))
 }
 
-const update = (req: Request, res: Response, next: NextFunction) => {
-    let { username } = req.body
+const update = async (req: Request, res: Response, next: NextFunction) => {
+    let { username, newName, newEmail } = req.body
+
+    await User.find({username})
+    .then(user => {
+        if(user.length){
+            let doc = user[0]
+            doc.set({name: newName, email: newEmail})
+
+            return doc
+                .save()
+                .then((usr) => res.status(201).json({ message : "user updated"}))
+                .catch(err => {
+                    Logging.error('Unsuccessful')
+                    return res.status(500).json({ Error: "Error Occured", err})
+                })
+        }
+        
+        return res.status(404).json({message: "User not found"})
+    })
 }
+
+/* const resetPassword = async (req: Request, res: Response, next: NextFunction){
+    // TODO: Reset controller
+    // skip Email OTL generation
+} */
 
 // const getAll = async (req: Request, res: Response, next: NextFunction) => {
     
@@ -129,4 +152,4 @@ const update = (req: Request, res: Response, next: NextFunction) => {
 // }
 
 
-export default {  register, login, validate }
+export default {  register, login, validate, update }
