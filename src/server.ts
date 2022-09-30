@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { config } from './config/config';
 import Logging from './library/Logging';
 import UserRoute from './routes/User'
+import WorkerRoute from './routes/Worker'
 
 const router = express()
 
@@ -45,6 +46,7 @@ const StartServer = () => {
     // routes
 
     router.use('/user', UserRoute)
+    router.use('/worker', WorkerRoute)
 
     /* HealthCheck */
 
