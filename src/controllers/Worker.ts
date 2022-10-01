@@ -120,6 +120,17 @@ const login = (req: Request, res: Response, next: NextFunction) => {
 }
 const update = (req: Request, res: Response, next: NextFunction) => {
     console.log(req.params)
+
+    let { name, email, mobileno } = req.body
+
+    if(!name || !email || !mobileno) {
+        return res.status(401).json({message: 'invalid request'})
+    }
+
+    Worker.findById(req.params.id)
+        .then(worker => {
+            console.log(worker)
+        })
 }
 const validate = (req: Request, res: Response, next: NextFunction) => {
     
