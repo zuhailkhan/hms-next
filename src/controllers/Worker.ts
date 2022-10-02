@@ -123,13 +123,19 @@ const update = (req: Request, res: Response, next: NextFunction) => {
 
     let { name, email, mobileno } = req.body
 
-    if(!name || !email || !mobileno) {
-        return res.status(401).json({message: 'invalid request'})
-    }
+    // if(!name || !email || !mobileno) {
+    //     return res.status(401).json({message: 'invalid request'})
+    // }
 
     Worker.findById(req.params.id)
         .then(worker => {
-            console.log(worker)
+            
+            let load = {
+                name, email, mobileno
+            }
+            let payload = {}
+
+            // need to figure out how to update only the truthy values. also the method needs to be type checked
         })
 }
 const validate = (req: Request, res: Response, next: NextFunction) => {
