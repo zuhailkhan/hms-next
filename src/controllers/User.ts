@@ -109,17 +109,28 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 }
 
 const update = async (req: Request, res: Response, next: NextFunction) => {
-    let { username, newName, newEmail } = req.body
+    let { email, name } = req.body // add mobileno for user later
+    let id = req.params.id
 
-    await User.find({username})
+    await User.findById(id)
     .then(user => {
-        if(user.length){
-            let doc = user[0]
-            doc.set({name: newName, email: newEmail})
+        if(user){
 
-            return doc
+            type Payload = { name: string, email: string}
+            let preload: Payload = { name, email }
+            let payload: any = {}
+
+            Object.keys(preload).forEach(k => {
+                if(preload[k as keyof typeof preload]){
+                    payload[k] = preload[k as keyof typeof preload]
+                }
+            })
+
+            user.set(payload)
+
+            return user
                 .save()
-                .then((usr) => res.status(201).json({ message : "user updated"}))
+                .then(() => res.status(201).json({ message : "user updated"}))
                 .catch(err => {
                     Logging.error('Unsuccessful')
                     return res.status(500).json({ Error: "Error Occured", err})
@@ -130,10 +141,59 @@ const update = async (req: Request, res: Response, next: NextFunction) => {
     })
 }
 
-/* const resetPassword = async (req: Request, res: Response, next: NextFunction){
+const updatePassword = async (req: Request, res: Response, next: NextFunction) => {
     // TODO: Reset controller
     // skip Email OTL generation
-} */
+    let id = req.params.id
+    let { oldpassword, newpassword, newpassword2  } = req.body
+
+    if(newpassword !== newpassword2) {
+        return res.status(401).json({ Error: "Password Mismatch"})
+    }
+
+    User.findById(id)
+        .then(user => {
+            if(user){
+
+                bcrypt.compare(oldpassword, user.password, (err, result)=> {
+                    if(err) {
+                        Logging.error(`Password Invalid`)
+                        return res.status(409).json({ message: "Password Invalid"})
+                    }
+
+                    if(result){
+                        bcrypt.genSalt(10, (error, salt) => {
+                            bcrypt.hash(newpassword, salt, (hashError, hash) => {
+                                if(hashError) {
+                                    Logging.error(`hashing Error`)
+                                    return res.status(500).json({ message: "Hashing Error"})
+                                }
+
+                                if(hash) {
+                                    
+                                    user.set({password: hash})
+                                        .save()
+                                        .then(s => {
+                                            Logging.info(`Password changed Successfully`)
+                                            return res.status(200).json({ message: "Password changed Successfully"})
+                                        })
+                                        .catch(e => {
+                                            Logging.error(`Error Changing Password : ${e}`)
+                                            return res.status(500).json({ message: "Server Error"})
+                                        })
+
+                                }
+                            })
+                        })
+                    }
+                })
+
+
+            }
+
+            return res.status(404).json({message: "User not found"})
+        })
+}
 
 // const getAll = async (req: Request, res: Response, next: NextFunction) => {
     
@@ -152,4 +212,4 @@ const update = async (req: Request, res: Response, next: NextFunction) => {
 // }
 
 
-export default {  register, login, validate, update }
+export default {  register, login, validate, update, updatePassword } 

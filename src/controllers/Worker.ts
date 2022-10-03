@@ -59,6 +59,13 @@ const register = (req: Request, res: Response, next: NextFunction) => {
         return res.status(400).json({message: 'Invalid and/or Missing Arguments'})
     }
 }
+
+/**
+ * 
+ * @method POST  
+ * @desc controls the user login based on the password provided in the body of the request 
+ */
+
 const login = (req: Request, res: Response, next: NextFunction) => {
     let { username, email, password} = req.body
 
@@ -118,29 +125,121 @@ const login = (req: Request, res: Response, next: NextFunction) => {
         return res.status(400).json({message: 'Invalid and/or Missing Arguments'})
     }
 }
+
+/**
+ * 
+ * @method POST
+ * @params UID
+ * @Desc Update the worker email, password, and mobile no
+ */
+
 const update = (req: Request, res: Response, next: NextFunction) => {
-    console.log(req.params)
 
     let { name, email, mobileno } = req.body
 
-    // if(!name || !email || !mobileno) {
-    //     return res.status(401).json({message: 'invalid request'})
-    // }
-
     Worker.findById(req.params.id)
         .then(worker => {
-            
-            let load = {
-                name, email, mobileno
-            }
-            let payload = {}
+            if(worker) {
 
-            // need to figure out how to update only the truthy values. also the method needs to be type checked
+                type Payload = {name?: string, email?: string, mobileno?: number}
+                let load: Payload = {
+                    name, email, mobileno
+                }
+                let payload = {} as any
+
+                // Done // need to figure out how to update only the truthy values. also the method needs to be type checked
+
+                Object.keys(load).forEach(k => {
+                    if(load[k as keyof typeof load]) {
+                        payload[k as keyof typeof load] = load[k as keyof typeof load]!
+                    }
+                })
+
+                worker.set(payload).save()
+                    .then(result => {
+                        return res.status(200).json({
+                            message: "Successfully Updated"
+                        })
+                    })
+                    .catch(error => {
+                        Logging.error(error)
+                        return res.status(401).json({message: "Error saving to DB"})
+                    })
+            }
+
+            else { 
+                return res.status(500).json({message: "Internal Server Error"})
+            }
+                
+            
         })
 }
+
+/**
+ * @Method POST
+ * @Params id
+ * @desc Update the user Password
+ * @mode Protected
+ * @comments Must be secured with a middleware
+ */
+
+const updatePassword = (req: Request, res: Response, next: NextFunction) => {
+    let id = req.params.id
+
+    let { oldpassword, newpassword, newpassword2 } = req.body
+
+    if(newpassword !== newpassword2) {
+        return res.status(401).json({ message: "Password mismatch"})
+    }
+
+    Worker.findById(id)
+        .then(worker => {
+            if(worker){
+                bcrypt.compare(oldpassword, worker.password, (err, result) => {
+                    if(err) {
+                        Logging.error(`Old Password invalid`)
+                        return res.status(401).json({ message: "Old Password is incorrect"})
+                    }
+
+                    if(result) {
+                        bcrypt.genSalt(10, (err, salt) => {
+                            bcrypt.hash(newpassword, salt, (error, hash) => {
+                                if(error) {
+                                    return res.status(500).json({message : "Server Error"})
+                                }
+
+                                if(hash) {
+
+                                    worker.set({password: newpassword})
+                                        .save()
+                                        .then(result => {
+                                            Logging.info(`Password for Worker ${worker.username} changed successfully`)
+                                            return res.status(200).json({message: "Password changed successfully"})
+                                        })
+                                        .catch(pError => {
+                                            Logging.error(pError)
+                                            return res.status(500).json({message: "Internal Server Error"})
+                                        })
+                                }
+                            })
+                        })
+                    }
+                })
+            } else {
+                return res.status(500).json({message: "Worker Not Found"})
+            }
+        })
+        .catch(error => {
+            Logging.error(`Unsuccessful, Unknown Error, ${error}`)
+            return res.status(409).json({})
+            message:"Unknown Error Occured"
+        })
+}
+
+
 const validate = (req: Request, res: Response, next: NextFunction) => {
     
 }
 
 
-export default { register, login, validate, update }
+export default { register, login, validate, update, updatePassword }
