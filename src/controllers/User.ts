@@ -11,6 +11,7 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
     Logging.info('User Validated')
 
     return res.status(200).json({
+        status: true,
         message: 'Authorized'
     })
 
@@ -51,6 +52,10 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
                 })
             })
         }
+    })
+    .catch(err => {
+        Logging.error(`Query Error: ${req}`)
+        return res.status(500).json({message: "Query Error"})
     })
        
 }
@@ -105,7 +110,10 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
             })
         }
     })
-    .catch(err => Logging.error(err))
+    .catch(err => {
+        Logging.error(err)
+        return res.status(404).json({Error: "Query Error"})
+    })
 }
 
 const update = async (req: Request, res: Response, next: NextFunction) => {
@@ -138,6 +146,10 @@ const update = async (req: Request, res: Response, next: NextFunction) => {
         }
         
         return res.status(404).json({message: "User not found"})
+    })
+    .catch(err => {
+        Logging.error('Query Error')
+        return res.status(500).json({ Error: "Query Error"})
     })
 }
 
@@ -193,23 +205,29 @@ const updatePassword = async (req: Request, res: Response, next: NextFunction) =
 
             return res.status(404).json({message: "User not found"})
         })
+        .catch(err => {
+            Logging.error(`Query Error: ${req}`)
+            return res.status(500).json({Error: "Query Error"})
+        })
 }
 
-// const getAll = async (req: Request, res: Response, next: NextFunction) => {
+const getUsersList = async (req: Request, res: Response, next: NextFunction) => {
     
-//     return User.find()
-//     .then((users) => {
-//         if(!users.length) {
-//             return res.status(201).json({
-//                 message: 'No users found'
-//             })
-//         }
-//         return res.status(200).json({users})
-//     })
-//     .catch((err) => {
-//         return res.status(500).json({err})
-//     })
-// }
+    return User.find()
+    .then((users) => {
+        if(!users.length) {
+            return res.status(201).json({
+                message: 'No users found'
+            })
+        }
+        return res.status(200).json({
+            UsersList: users
+        })
+    })
+    .catch((err) => {
+        return res.status(500).json({err})
+    })
+}
 
 
-export default {  register, login, validate, update, updatePassword } 
+export default {  register, login, validate, update, updatePassword, getUsersList } 
