@@ -4,6 +4,7 @@ import { config } from './config/config';
 import Logging from './library/Logging';
 import UserRoute from './routes/User'
 import WorkerRoute from './routes/Worker'
+import AdminRoute from './routes/Admin'
 
 const router = express()
 
@@ -47,6 +48,7 @@ const StartServer = () => {
 
     router.use('/user', UserRoute)
     router.use('/worker', WorkerRoute)
+    router.use('/admin', AdminRoute)
 
     /* HealthCheck */
 
