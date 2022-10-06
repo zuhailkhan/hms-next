@@ -8,6 +8,6 @@ app.get('/validate', extractJWT, controller.validate)
 app.post('/login', controller.login)
 app.post('/update/:id', controller.update)
 app.post('/updatePassword/:id', controller.updatePassword)
-
+app.post('/register', controller.register)
 
 export default app
