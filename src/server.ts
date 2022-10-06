@@ -5,6 +5,7 @@ import Logging from './library/Logging';
 import UserRoute from './routes/User'
 import WorkerRoute from './routes/Worker'
 import AdminRoute from './routes/Admin'
+import InventoryRoute from './routes/Inventory'
 
 const router = express()
 
@@ -44,18 +45,18 @@ const StartServer = () => {
         next();
     })
 
-    // routes
+    // route Handlers
 
     router.use('/user', UserRoute)
     router.use('/worker', WorkerRoute)
     router.use('/admin', AdminRoute)
+    router.use('/inventory', InventoryRoute)
 
     /* HealthCheck */
 
     router.get('/ping', (req, res, next)=> {
         return res.status(200).json({ message: 'pong'})
     })
-
 
     // error handling
 
