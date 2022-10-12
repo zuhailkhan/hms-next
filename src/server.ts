@@ -6,6 +6,7 @@ import UserRoute from './routes/User'
 import WorkerRoute from './routes/Worker'
 import AdminRoute from './routes/Admin'
 import InventoryRoute from './routes/Inventory'
+import ComplaintRoute from './routes/Complaint'
 
 const router = express()
 
@@ -51,6 +52,7 @@ const StartServer = () => {
     router.use('/worker', WorkerRoute)
     router.use('/admin', AdminRoute)
     router.use('/inventory', InventoryRoute)
+    router.use('/complaint', ComplaintRoute)
 
     /* HealthCheck */
 
