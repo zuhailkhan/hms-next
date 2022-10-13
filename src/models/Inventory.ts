@@ -1,15 +1,15 @@
 import mongoose, { Document, Schema } from 'mongoose'
 
-interface ICategory {  
+interface IInventory {  
     name: string,
     type: string,
 }
 
-interface ICategoryModel extends ICategory, Document {}
+interface IInventoryModel extends IInventory, Document {}
 
-const CategorySchema: Schema = new Schema({
+const InventorySchema: Schema = new Schema({
     name: { type:String, required: true},
     type: { type:String, required:true}
-}, { collection: 'inventory'})
+}, { collection: 'Inventory'})
 
-export default mongoose.model<ICategoryModel>( 'Category', CategorySchema)
+export default mongoose.model<IInventoryModel>( 'Inventory', InventorySchema)

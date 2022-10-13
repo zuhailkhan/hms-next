@@ -10,6 +10,18 @@ const create = (req: Request, res: Response, next: NextFunction) => {
 
     Complaint.find({ registeredBy: userid })
     .then(complaintsByUser => {
+
+        if(complaintsByUser.length){
+            complaintsByUser.forEach(complaint => {
+                complaint.populate([{path: 'registeredBy', select: 'name username _id'}, {path: 'type'}])
+                .then(q => {
+                    console.log(q)
+                })
+            })
+        }
+
+        // testing foreign key / mongoose populate()
+
         if(!complaintsByUser.length){
 
             let newComplaint = new Complaint({
@@ -25,7 +37,7 @@ const create = (req: Request, res: Response, next: NextFunction) => {
             newComplaint.save()
             .then((q) => {
                 Logging.info(`Complaint Registered: ${q}`)
-                return res.status(200)
+                return res.status(200).json({message: "Complaint registered successfully"})
             })
 
         }
