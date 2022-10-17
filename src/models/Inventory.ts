@@ -13,3 +13,5 @@ const InventorySchema: Schema = new Schema({
 }, { collection: 'Inventory'})
 
 export default mongoose.model<IInventoryModel>( 'Inventory', InventorySchema)
+
+export { IInventoryModel }
