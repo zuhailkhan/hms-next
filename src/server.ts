@@ -35,8 +35,9 @@ const StartServer = () => {
     router.use(express.json())
 
     router.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', '*')
+        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5173')
         res.header('Access-Control-Allow-Headers', 'Origin, x-Requested-With, Content-Type, Accept, Authorization')
+        res.header('Access-Control-Allow-Credentials', 'true')
 
         if(req.method == 'OPTIONS') {
             res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');

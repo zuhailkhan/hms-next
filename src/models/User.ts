@@ -1,11 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose'
-
-interface IUser {
-    name: string,
-    username: string,
-    email: string,
-    password: string
-}
+import IUser from '../interfaces/User'
 
 interface IUserModel extends IUser, Document {}
 
