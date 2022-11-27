@@ -2,7 +2,6 @@ import { Request, Response, NextFunction} from 'express';
 import Logging from '../library/Logging';
 import Complaint from '../models/Complaint'
 import mongoose from 'mongoose'
-import Worker from '../models/Worker';
 
 const create = (req: Request, res: Response, next: NextFunction) => {
 

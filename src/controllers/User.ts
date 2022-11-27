@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from 'express'
 import User from '../models/User'
-import bcrypt from 'bcryptjs'
+import bcrypt, { hash } from 'bcryptjs'
 import Logging from '../library/Logging'
 import {config} from '../config/config'
 import jwt from 'jsonwebtoken'
+import roles from '../config/roles'
 
 
 const validate = (req: Request, res: Response, next: NextFunction) => {
@@ -19,45 +20,111 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
 
 const register = async (req: Request, res: Response, next: NextFunction) => {
 
-    let { name, username, email, password } = req.body
+    let { name, username, email, password, type } = req.body
+
+    if(!roles.includes(type)){
+        return res.status(403).json({ 
+            status: false,
+            message: 'invalid role'
+        })
+    }
 
     await User.find({ $or: [{username}, {email}]})
-    .then(user => {
-        if(user.length){
-            return res.status(409).json({message: `username already registered`})
-        }
-
-        if(!user.length) {
-            bcrypt.genSalt(10, (err, salt) => {
-                if(err) Logging.error(err)
-                bcrypt.hash(password, salt, async (err, hash) => {
-                    if(err) Logging.error(err)
-        
-                    let load = new User({
-                        name,
-                        username,
-                        email,
-                        password: hash
-                    })
-        
-                    await load.save()
-                    .then(() => {
-                        return res.status(201).json({message: "User Created Successfully"})
-                    })
-                    .catch(err => {
-                        Logging.error(err)
-                        res.status(500).json({err})
-                    })
-        
+        .then(user => {
+            if(user.length) {
+                return res.status(200).json({
+                    status: false,
+                    message: `username already exists`
                 })
+            }
+
+            else if(!user.length) {
+                bcrypt.hash(password, 10, (err, hash) => {
+                    if(err) {
+                        Logging.error(err)
+                        throw Error(err.message)
+                    }
+
+                    
+                    jwt.sign(
+                        {
+                            username, email, type
+                        },
+                        config.keyChain.accessKey,
+                        {expiresIn: '60s'},
+                        (error, token) => {
+                            if(error) {
+                                Logging.error(error)
+                                return res.status(409).json({
+                                    status:false,
+                                    message: `Signing error`,
+                                    error: error
+                                })
+                            }
+                            if(token) {
+                                jwt.sign(
+                                    {
+                                        username,
+                                        accessToken: token
+                                    },
+                                    config.keyChain.refreshKey,
+                                    {expiresIn: "1d"},
+                                    (error, refreshToken) => {
+                                        if(error) {
+                                            Logging.error(`Error generating Refresh token`)
+                                            return res.status(500).json({
+                                                status: false,
+                                                message: `Error generating Refresh token, Please manually login`,
+                                                Error: error
+                                            })
+                                        }
+
+                                        if(refreshToken) {
+                                            let usr = new User({
+                                                name, 
+                                                username,
+                                                email, 
+                                                password: hash, 
+                                                role: roles.find(r => r.id == type)!.id
+                                            })
+
+                                            
+                                            usr.save()
+                                            .then(() => {
+                                                Logging.info('Registered Successfully')
+                                                res.cookie('jwt', refreshToken, {httpOnly: true, secure: true, sameSite: 'none', maxAge: 24 * 60 * 60 * 1000})
+                                                return res.status(200).json({
+                                                    status: true,
+                                                    message: 'Registered Successfully',
+                                                    token: `Bearer ${token}`
+                                                })
+                                            })
+                                            .catch(err => {
+                                                Logging.error(err)
+                                                return res.status(500).json({
+                                                    status:false,
+                                                    message: 'Error registering user',
+                                                    error: err
+                                                })
+                                            })
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                })
+            }
+        })
+        .catch(error => {
+            Logging.error(`Invalid Query`)
+            return res.status(401).json({
+                status: false,
+                message: 'Invalid Query',
+                Error: error
             })
-        }
-    })
-    .catch(err => {
-        Logging.error(`Query Error: ${req}`)
-        return res.status(500).json({message: "Query Error"})
-    })
-       
+        })
+    /* End Controller */
 }
 
 const login = async (req: Request, res: Response, next: NextFunction) => {
@@ -85,14 +152,15 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                             "username" : user[0].username, 
                             "email" : user[0].email
                         },
-                        config.server.secret,
-                        {expiresIn:"6h"},
+                        config.keyChain.accessKey,
+                        {expiresIn:"60s"},
                         (err, token)=> {
                             if(err) {
                                 Logging.error(err)
                             }
                             if(token){
                                 Logging.info(user[0]._id)
+                                
                                 res.status(200).json({ 
                                     status: true,
                                     token : `Bearer ${token}`,

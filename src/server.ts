@@ -3,8 +3,6 @@ import mongoose from 'mongoose';
 import { config } from './config/config';
 import Logging from './library/Logging';
 import UserRoute from './routes/User'
-import WorkerRoute from './routes/Worker'
-import AdminRoute from './routes/Admin'
 import InventoryRoute from './routes/Inventory'
 import ComplaintRoute from './routes/Complaint'
 
@@ -50,8 +48,6 @@ const StartServer = () => {
     // route Handlers
 
     router.use('/user', UserRoute)
-    router.use('/worker', WorkerRoute)
-    router.use('/admin', AdminRoute)
     router.use('/inventory', InventoryRoute)
     router.use('/complaint', ComplaintRoute)
 
