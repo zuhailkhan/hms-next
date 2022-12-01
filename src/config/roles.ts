@@ -1,15 +1,15 @@
 const roles = [
     {
         name: 'user',
-        id: '0001'
+        id: '1'
     },
     {
         name: 'worker',
-        id: '0010'
+        id: '10'
     },
     {
         name: 'admin',
-        id: '0100'
+        id: '100'
     }
 ]
 

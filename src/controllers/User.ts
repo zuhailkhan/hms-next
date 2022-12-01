@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 import User from '../models/User'
-import bcrypt, { hash } from 'bcryptjs'
+import bcrypt from 'bcryptjs'
 import Logging from '../library/Logging'
 import {config} from '../config/config'
 import jwt from 'jsonwebtoken'
@@ -22,13 +22,6 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
 
     let { name, username, email, password, type } = req.body
 
-    if(!roles.includes(type)){
-        return res.status(403).json({ 
-            status: false,
-            message: 'invalid role'
-        })
-    }
-
     await User.find({ $or: [{username}, {email}]})
         .then(user => {
             if(user.length) {
@@ -37,91 +30,103 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
                     message: `username already exists`
                 })
             }
+            bcrypt.hash(password, 10, (error, hash) => {
+                if(error) {
+                    return res.status(500).json({
+                        status: false, 
+                        message: 'Internal Error, Registration Failed',
+                        Error: error.message
+                    })
+                }
 
-            else if(!user.length) {
-                bcrypt.hash(password, 10, (err, hash) => {
-                    if(err) {
-                        Logging.error(err)
-                        throw Error(err.message)
+                if(hash) {
+                    let role = roles.find(r => r.id === type)
+                    if(!role) {
+                        Logging.error(`Invalid Role: ${type}`)
+                        return res.status(401).json({ 
+                            status: false, 
+                            message: "Invalid role in the request"
+                        })
                     }
 
-                    
-                    jwt.sign(
-                        {
-                            username, email, type
-                        },
-                        config.keyChain.accessKey,
-                        {expiresIn: '60s'},
-                        (error, token) => {
-                            if(error) {
-                                Logging.error(error)
-                                return res.status(409).json({
-                                    status:false,
-                                    message: `Signing error`,
-                                    error: error
+                    interface Tokens {
+                        accessToken: string,
+                        refreshToken: string
+                    }
+
+                    let getTokens = new Promise<Tokens>((resolve, reject) => {
+                        jwt.sign({ username, email, role }, config.keyChain.accessKey, {expiresIn: "60s"}, (atErr, accessToken) => {
+                            if(atErr) {
+                                Logging.error(atErr)
+                                reject(atErr)
+                                return res.status(500).json({
+                                    status: false,
+                                    message: "Internal Error",
+                                    Error: atErr.message
                                 })
                             }
-                            if(token) {
-                                jwt.sign(
-                                    {
-                                        username,
-                                        accessToken: token
-                                    },
-                                    config.keyChain.refreshKey,
-                                    {expiresIn: "1d"},
-                                    (error, refreshToken) => {
-                                        if(error) {
-                                            Logging.error(`Error generating Refresh token`)
-                                            return res.status(500).json({
-                                                status: false,
-                                                message: `Error generating Refresh token, Please manually login`,
-                                                Error: error
-                                            })
-                                        }
-
-                                        if(refreshToken) {
-                                            let usr = new User({
-                                                name, 
-                                                username,
-                                                email, 
-                                                password: hash, 
-                                                role: roles.find(r => r.id == type)!.id
-                                            })
-
-                                            
-                                            usr.save()
-                                            .then(() => {
-                                                Logging.info('Registered Successfully')
-                                                res.cookie('jwt', refreshToken, {httpOnly: true, secure: true, sameSite: 'none', maxAge: 24 * 60 * 60 * 1000})
-                                                return res.status(200).json({
-                                                    status: true,
-                                                    message: 'Registered Successfully',
-                                                    token: `Bearer ${token}`
-                                                })
-                                            })
-                                            .catch(err => {
-                                                Logging.error(err)
-                                                return res.status(500).json({
-                                                    status:false,
-                                                    message: 'Error registering user',
-                                                    error: err
-                                                })
-                                            })
-                                        }
+    
+                            if(accessToken) {
+                                jwt.sign({accessToken, username}, config.keyChain.refreshKey, {expiresIn:"1d"}, (rtErr, refreshToken) => {
+                                    if(rtErr) {
+                                        Logging.error(rtErr)
+                                        reject(rtErr)
+                                        return res.status(500).json({
+                                            status: false,
+                                            message: "Internal Error",
+                                            Error: rtErr.message
+                                        })
                                     }
-                                )
+                                    if(refreshToken) {
+                                        res.cookie('jwt', refreshToken, {httpOnly: true, secure: true, sameSite: 'none', maxAge: 24 * 60 * 60 * 1000})
+                                        resolve({accessToken, refreshToken})
+                                    }
+                                } )
                             }
-                        }
-                    )
-                })
-            }
+                        })
+                    })
+
+                    getTokens
+                    .then(({accessToken, refreshToken}) => {
+                        let nUser = new User({
+                            name,
+                            username,
+                            password: hash,
+                            email,
+                            role,
+                            refreshToken
+                        })
+                        
+                        nUser.save()
+                            .then((val)=>{
+                                Logging.info(`Successfully registered ${val.username}`)
+                                return res.status(200).json({
+                                    status: true,
+                                    message: `Successfully registered ${val.username}`,
+                                    token: `Bearer ${accessToken}`,
+                                })
+                            })
+                            .catch(err => {
+                                Logging.error(`An Error Occured while saving: ${err}`)
+                                return res.status(500).json({
+                                    status: false,
+                                    message: "Internal Error",
+                                    Error: err.message
+                                })
+                            })
+                    })
+
+
+                }
+            })
+
         })
         .catch(error => {
             Logging.error(`Invalid Query`)
             return res.status(401).json({
                 status: false,
                 message: 'Invalid Query',
-                Error: error
+                Error: error.message
             })
         })
     /* End Controller */
@@ -142,6 +147,11 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                 if(err){
                     // error handling
                     Logging.error(err)
+                    return res.status(500).json({
+                        status:false,
+                        message: "Internal Error",
+                        Error: err.message
+                    })
                 }
                 if(result){
                     Logging.info('login successful')
@@ -150,7 +160,8 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                     jwt.sign(
                         {   
                             "username" : user[0].username, 
-                            "email" : user[0].email
+                            "email" : user[0].email,
+                            "role" : user[0].role,
                         },
                         config.keyChain.accessKey,
                         {expiresIn:"60s"},
@@ -161,12 +172,33 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                             if(token){
                                 Logging.info(user[0]._id)
                                 
-                                res.status(200).json({ 
-                                    status: true,
-                                    token : `Bearer ${token}`,
-                                    username: user[0].username,
-                                    email: user[0].email
-                                })
+                                jwt.sign(
+                                    {
+                                        username: user[0].username,
+                                        accessToken : `Bearer ${token}`
+                                    },
+                                    config.keyChain.refreshKey,
+                                    {expiresIn: "1d"},
+                                    (err, refreshToken) => {
+                                        if(err) {
+                                            Logging.error('Signing token failed')
+                                            return res.status(500).json({
+                                                status: false,
+                                                message: err.message
+                                            })
+                                        }
+
+                                        if(refreshToken) {
+                                            res.cookie('jwt', refreshToken)
+                                            res.status(200).json({ 
+                                                status: true,
+                                                accessToken : `Bearer ${token}`,
+                                                username: user[0].username,
+                                                email: user[0].email
+                                            })
+                                        }
+                                    }
+                                )
                             }
                         }
                     )

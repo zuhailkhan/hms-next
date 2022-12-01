@@ -8,7 +8,8 @@ const UserSchema : Schema = new Schema({
     username: { type:String, required: true, unique: true},
     email: { type:String, required: true, unique: true},
     password: { type:String, required: true},
-    roles: { type:Number, default: '0001'}
+    role: { type:Object, required: true, default: {id: 1, name: 'user'}},
+    refreshToken: {type: String, required: true }
 },{
     collection: 'users'
 } )
