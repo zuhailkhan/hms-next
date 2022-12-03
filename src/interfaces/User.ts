@@ -7,5 +7,6 @@ export default interface IUser {
         id: Number,
         name: string
     },
-    refreshToken: string
+    refreshToken: string,
+    mobileno: number
 }

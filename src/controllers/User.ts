@@ -7,27 +7,34 @@ import jwt from 'jsonwebtoken'
 import roles from '../config/roles'
 
 
-const validate = (req: Request, res: Response, next: NextFunction) => {
+const register = async (req: Request, res: Response) => {
 
-    Logging.info('User Validated')
+    let { name, username, email, password, type, mobileno } = req.body
 
-    return res.status(200).json({
-        status: true,
-        message: 'Authorized'
-    })
-
-}
-
-const register = async (req: Request, res: Response, next: NextFunction) => {
-
-    let { name, username, email, password, type } = req.body
-
-    await User.find({ $or: [{username}, {email}]})
+    await User.find({ $or: [{username}, {email}, {mobileno}]})
         .then(user => {
             if(user.length) {
-                return res.status(200).json({
-                    status: false,
-                    message: `username already exists`
+                user.map(x => {
+                    if(x.username == username) {
+                        return res.status(403).json({
+                            status: false,
+                            message: "username already exists"
+                        })
+                    }
+
+                    if(x.email == email) {
+                        return res.status(403).json({
+                            status: false,
+                            message: "email already exists"
+                        })
+                    }
+
+                    if(x.mobileno == mobileno) {
+                        return res.status(403).json({
+                            status: false,
+                            message: "mobile number is already registered"
+                        })
+                    }
                 })
             }
             bcrypt.hash(password, 10, (error, hash) => {
@@ -55,7 +62,7 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
                     }
 
                     let getTokens = new Promise<Tokens>((resolve, reject) => {
-                        jwt.sign({ username, email, role }, config.keyChain.accessKey, {expiresIn: "60s"}, (atErr, accessToken) => {
+                        jwt.sign({ username, email, mobileno, role }, config.keyChain.accessKey, {expiresIn: "60s"}, (atErr, accessToken) => {
                             if(atErr) {
                                 Logging.error(atErr)
                                 reject(atErr)
@@ -78,7 +85,7 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
                                         })
                                     }
                                     if(refreshToken) {
-                                        res.cookie('jwt', refreshToken, {httpOnly: true, secure: true, sameSite: 'none', maxAge: 24 * 60 * 60 * 1000})
+                                        res.cookie('jwt', refreshToken, {httpOnly: true, secure: true, sameSite: 'none', maxAge: 86400000 })
                                         resolve({accessToken, refreshToken})
                                     }
                                 } )
@@ -94,7 +101,8 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
                             password: hash,
                             email,
                             role,
-                            refreshToken
+                            refreshToken,
+                            mobileno
                         })
                         
                         nUser.save()
@@ -132,11 +140,11 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
     /* End Controller */
 }
 
-const login = async (req: Request, res: Response, next: NextFunction) => {
+const login = async (req: Request, res: Response) => {
 
-    let { username, email, password} = req.body
+    let { username, email, mobileno, password } = req.body
 
-    await User.find({$or: [{username}, {email}]})
+    await User.find({$or: [{username}, {email}, {mobileno} ]})
     .then(user => {
         if(!user.length){
             return res.status(400).json({err: "User Not Found"})
@@ -159,9 +167,10 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                     // pass jwt here
                     jwt.sign(
                         {   
-                            "username" : user[0].username, 
-                            "email" : user[0].email,
-                            "role" : user[0].role,
+                            username : user[0].username, 
+                            email : user[0].email,
+                            mobileno: user[0].mobileno,
+                            role : user[0].role,
                         },
                         config.keyChain.accessKey,
                         {expiresIn:"60s"},
@@ -174,7 +183,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                                 
                                 jwt.sign(
                                     {
-                                        username: user[0].username,
+                                        userId: user[0]._id,
                                         accessToken : `Bearer ${token}`
                                     },
                                     config.keyChain.refreshKey,
@@ -189,7 +198,10 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
                                         }
 
                                         if(refreshToken) {
-                                            res.cookie('jwt', refreshToken)
+                                            res.cookie('refreshToken', refreshToken, {httpOnly: true, maxAge: 86400000 , sameSite: 'none'})
+                                            res.cookie('accessToken', token, {httpOnly: true, maxAge: 320000})
+                                            user[0].refreshToken = refreshToken
+                                            user[0].save()
                                             res.status(200).json({ 
                                                 status: true,
                                                 accessToken : `Bearer ${token}`,
@@ -216,16 +228,16 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     })
 }
 
-const update = async (req: Request, res: Response, next: NextFunction) => {
-    let { email, name } = req.body // add mobileno for user later
+const update = async (req: Request, res: Response) => {
+    let { email, name, mobileno } = req.body
     let id = req.params.id
 
     await User.findById(id)
     .then(user => {
         if(user){
 
-            type Payload = { name: string, email: string}
-            let preload: Payload = { name, email }
+            type Payload = { name: string, email: string, mobileno: string}
+            let preload: Payload = { name, email, mobileno }
             let payload: any = {}
 
             Object.keys(preload).forEach(k => {
@@ -253,7 +265,7 @@ const update = async (req: Request, res: Response, next: NextFunction) => {
     })
 }
 
-const updatePassword = async (req: Request, res: Response, next: NextFunction) => {
+const updatePassword = async (req: Request, res: Response) => {
     // TODO: Reset controller
     // skip Email OTL generation
     let id = req.params.id
@@ -274,28 +286,26 @@ const updatePassword = async (req: Request, res: Response, next: NextFunction) =
                     }
 
                     if(result){
-                        bcrypt.genSalt(10, (error, salt) => {
-                            bcrypt.hash(newpassword, salt, (hashError, hash) => {
-                                if(hashError) {
-                                    Logging.error(`hashing Error`)
-                                    return res.status(500).json({ message: "Hashing Error"})
-                                }
+                        bcrypt.hash(newpassword, 10, (hashError, hash) => {
+                            if(hashError) {
+                                Logging.error(`hashing Error`)
+                                return res.status(500).json({ message: "Hashing Error"})
+                            }
 
-                                if(hash) {
-                                    
-                                    user.set({password: hash})
-                                        .save()
-                                        .then(s => {
-                                            Logging.info(`Password changed Successfully`)
-                                            return res.status(200).json({ message: "Password changed Successfully"})
-                                        })
-                                        .catch(e => {
-                                            Logging.error(`Error Changing Password : ${e}`)
-                                            return res.status(500).json({ message: "Server Error"})
-                                        })
+                            if(hash) {
+                                
+                                user.set({password: hash})
+                                    .save()
+                                    .then(s => {
+                                        Logging.info(`Password changed Successfully`)
+                                        return res.status(200).json({ message: "Password changed Successfully"})
+                                    })
+                                    .catch(e => {
+                                        Logging.error(`Error Changing Password : ${e}`)
+                                        return res.status(500).json({ message: "Server Error"})
+                                    })
 
-                                }
-                            })
+                            }
                         })
                     }
                 })
@@ -307,27 +317,36 @@ const updatePassword = async (req: Request, res: Response, next: NextFunction) =
         })
         .catch(err => {
             Logging.error(`Query Error: ${req}`)
-            return res.status(500).json({Error: "Query Error"})
+            return res.status(500).json({
+                status: false,
+                message: "Query Error",
+                Error: err
+            })
         })
 }
 
-const getUsersList = async (req: Request, res: Response, next: NextFunction) => {
+const getUsersList = async (req: Request, res: Response) => {
     
     return User.find()
     .then((users) => {
         if(!users.length) {
             return res.status(201).json({
+                status: false,
                 message: 'No users found'
             })
         }
         return res.status(200).json({
+            status: true,
             UsersList: users
         })
     })
     .catch((err) => {
-        return res.status(500).json({err})
+        return res.status(500).json({
+            status: false,
+            Error: err
+        })
     })
 }
 
 
-export default {  register, login, validate, update, updatePassword, getUsersList } 
+export default {  register, login, update, updatePassword, getUsersList } 
