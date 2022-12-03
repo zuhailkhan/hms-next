@@ -3,10 +3,9 @@ import mongoose from 'mongoose';
 import { config } from './config/config';
 import Logging from './library/Logging';
 import UserRoute from './routes/User'
-import WorkerRoute from './routes/Worker'
-import AdminRoute from './routes/Admin'
-import InventoryRoute from './routes/Inventory'
-import ComplaintRoute from './routes/Complaint'
+import cookieParser from 'cookie-parser'
+import cors from 'cors'
+import corsOptions from './config/corsOpts'
 
 const router = express()
 
@@ -33,26 +32,27 @@ const StartServer = () => {
 
     router.use(express.urlencoded({ extended: true }))
     router.use(express.json())
+    router.use(cookieParser());
+    router.use(cors(corsOptions))
 
-    router.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', '*')
-        res.header('Access-Control-Allow-Headers', 'Origin, x-Requested-With, Content-Type, Accept, Authorization')
+    // router.use((req, res, next) => {
+    //     res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5173')
+    //     res.header('Access-Control-Allow-Headers', 'Origin, x-Requested-With, Content-Type, Accept, Authorization')
+    //     res.header('Access-Control-Allow-Credentials', 'true')
 
-        if(req.method == 'OPTIONS') {
-            res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');
-            return res.status(200).json({ message: 'true'})
-        }
+    //     if(req.method == 'OPTIONS') {
+    //         res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');
+    //         return res.status(200).json({ message: 'true'})
+    //     }
 
-        next();
-    })
+    //     next();
+    // })
 
     // route Handlers
 
     router.use('/user', UserRoute)
-    router.use('/worker', WorkerRoute)
-    router.use('/admin', AdminRoute)
-    router.use('/inventory', InventoryRoute)
-    router.use('/complaint', ComplaintRoute)
+    // router.use('/inventory', InventoryRoute)
+    // router.use('/complaint', ComplaintRoute)
 
     /* HealthCheck */
 
