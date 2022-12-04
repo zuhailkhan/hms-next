@@ -228,6 +228,54 @@ const login = async (req: Request, res: Response) => {
     })
 }
 
+const logout = (req: Request, res: Response) => {
+    // delete cookies
+    let refreshToken = req.cookies.refreshToken
+    res.cookie('accessToken', '', { maxAge: 0, httpOnly: true})
+    // get userID from refresh token
+    if(refreshToken){
+        jwt.verify(refreshToken, config.keyChain.refreshKey, {}, (err, {userId}: any) => {
+            if(err){
+                res.cookie('accessToken', '', { maxAge: 0, httpOnly: true})
+            }
+    
+            if(userId) {
+                User.findById(userId)
+                    .then(user => {
+                        if(user) {
+                            user.refreshToken = 'expired',
+                            user.save()
+                                .then(() => {
+                                    res.cookie('refreshToken', '', { maxAge: 0, httpOnly: true})
+                                    Logging.info('tokens cleared successfully')
+                                    return res.status(200).json({
+                                        status: true,
+                                        message: 'Logged out successfully'
+                                    })
+                                }).catch(error => {
+                                    Logging.warn(error.message)
+                                    res.cookie('refreshToken', '', { maxAge: 0, httpOnly: true})
+                                    return res.status(200).json({
+                                        status: true
+                                    })
+                                })
+                        }
+                        if(!user){
+                            res.cookie('refreshToken', '', { maxAge: 0, httpOnly: true})
+                        }
+                    })            
+            }
+        })
+    }
+
+    if(!refreshToken){
+        return res.status(200).json({
+            status: true,
+            message: "logged out"
+        })
+    }
+}
+
 const update = async (req: Request, res: Response) => {
     let { email, name, mobileno } = req.body
     let id = req.params.id
@@ -349,4 +397,4 @@ const getUsersList = async (req: Request, res: Response) => {
 }
 
 
-export default {  register, login, update, updatePassword, getUsersList } 
+export default {  register, login, update, updatePassword, getUsersList, logout } 

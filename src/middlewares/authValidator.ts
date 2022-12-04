@@ -84,6 +84,7 @@ const authValidator = (req: Request, res: Response, next: NextFunction) => {
                 return next();
             }
         })
+
     }
 
 }
